@@ -532,6 +532,8 @@ function App() {
         return <AboutPage />;
       case 'contact':
         return <ContactPage />;
+      case 'success':
+        return <SuccessPage />;
       default:
         return <HomePage />;
     }
