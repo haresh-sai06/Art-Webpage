@@ -4,7 +4,7 @@ import sys
 import json
 from datetime import datetime
 
-class ArtistPortfolioAPITester:
+class ArtistPortfolioTester:
     def __init__(self, base_url):
         self.base_url = base_url
         self.tests_run = 0
@@ -29,20 +29,21 @@ class ArtistPortfolioAPITester:
             if success:
                 self.tests_passed += 1
                 print(f"✅ Passed - Status: {response.status_code}")
-                if response.content:
-                    try:
-                        return success, response.json()
-                    except json.JSONDecodeError:
-                        return success, response.text
-                return success, None
+                try:
+                    return success, response.json()
+                except:
+                    return success, {}
             else:
                 print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
-                print(f"Response: {response.text}")
-                return False, None
+                try:
+                    print(f"Response: {response.text}")
+                    return False, response.json()
+                except:
+                    return False, {}
 
         except Exception as e:
             print(f"❌ Failed - Error: {str(e)}")
-            return False, None
+            return False, {}
 
     def test_get_all_artworks(self):
         """Test getting all artworks"""
@@ -52,17 +53,17 @@ class ArtistPortfolioAPITester:
             "api/artworks",
             200
         )
-        if success and response:
+        if success and isinstance(response, list) and len(response) > 0:
             print(f"Found {len(response)} artworks")
-            if len(response) > 0:
-                self.artwork_id = response[0]['id']  # Store first artwork ID for later tests
-                print(f"Selected artwork ID for detailed tests: {self.artwork_id}")
-        return success
+            # Store an artwork ID for later tests
+            self.artwork_id = response[0]['id']
+            return True
+        return False
 
     def test_get_artwork_by_id(self):
         """Test getting a specific artwork by ID"""
         if not self.artwork_id:
-            print("❌ Cannot test artwork details - no artwork ID available")
+            print("❌ No artwork ID available for testing")
             return False
             
         success, response = self.run_test(
@@ -71,14 +72,15 @@ class ArtistPortfolioAPITester:
             f"api/artworks/{self.artwork_id}",
             200
         )
-        if success and response:
-            print(f"Artwork details: {response['title']} - ${response['price']}")
-        return success
+        if success and 'id' in response and response['id'] == self.artwork_id:
+            print(f"Successfully retrieved artwork: {response['title']}")
+            return True
+        return False
 
     def test_get_artworks_by_category(self):
         """Test filtering artworks by category"""
         categories = ['abstract', 'landscape', 'digital']
-        all_success = True
+        all_passed = True
         
         for category in categories:
             success, response = self.run_test(
@@ -87,13 +89,18 @@ class ArtistPortfolioAPITester:
                 f"api/artworks?category={category}",
                 200
             )
-            if success and response:
+            if success and isinstance(response, list):
                 print(f"Found {len(response)} artworks in category '{category}'")
-                all_success = all_success and success
+                # Verify all returned artworks have the correct category
+                if all(artwork['category'] == category for artwork in response):
+                    print(f"✅ All returned artworks have category '{category}'")
+                else:
+                    print(f"❌ Some artworks have incorrect category")
+                    all_passed = False
             else:
-                all_success = False
+                all_passed = False
                 
-        return all_success
+        return all_passed
 
     def test_get_featured_artworks(self):
         """Test getting featured artworks"""
@@ -103,17 +110,18 @@ class ArtistPortfolioAPITester:
             "api/featured-artworks",
             200
         )
-        if success and response:
+        if success and isinstance(response, list):
             print(f"Found {len(response)} featured artworks")
-        return success
+            return True
+        return False
 
     def test_add_to_cart(self):
-        """Test adding an item to cart"""
+        """Test adding an artwork to cart"""
         if not self.artwork_id:
-            print("❌ Cannot test add to cart - no artwork ID available")
+            print("❌ No artwork ID available for testing")
             return False
             
-        cart_item = {
+        cart_data = {
             "artwork_id": self.artwork_id,
             "quantity": 1
         }
@@ -123,39 +131,66 @@ class ArtistPortfolioAPITester:
             "POST",
             "api/cart/add",
             200,
-            data=cart_item
+            data=cart_data
         )
         return success
 
-    def run_all_tests(self):
-        """Run all API tests"""
-        print("=" * 50)
-        print("🧪 ARTIST PORTFOLIO API TESTS")
-        print("=" * 50)
+    def test_checkout_session(self):
+        """Test creating a checkout session"""
+        if not self.artwork_id:
+            print("❌ No artwork ID available for testing")
+            return False
+            
+        checkout_data = {
+            "items": [
+                {
+                    "artwork_id": self.artwork_id,
+                    "quantity": 1
+                }
+            ],
+            "customer_email": "test@example.com"
+        }
         
-        # Run all tests
-        self.test_get_all_artworks()
-        self.test_get_artwork_by_id()
-        self.test_get_artworks_by_category()
-        self.test_get_featured_artworks()
-        self.test_add_to_cart()
+        success, response = self.run_test(
+            "Create Checkout Session",
+            "POST",
+            "api/checkout/create-session",
+            200,
+            data=checkout_data
+        )
         
-        # Print summary
-        print("\n" + "=" * 50)
-        print(f"📊 SUMMARY: {self.tests_passed}/{self.tests_run} tests passed")
-        print("=" * 50)
-        
-        return self.tests_passed == self.tests_run
+        if success and 'session_id' in response and 'session_url' in response:
+            print(f"Successfully created checkout session with ID: {response['session_id']}")
+            return True
+        return False
 
 def main():
-    # Get backend URL from environment variable or use default
+    # Get the backend URL from environment variable or use default
     backend_url = "https://b53e54d0-03b2-4a93-9b74-3e843efe8655.preview.emergentagent.com"
     
-    print(f"Testing API at: {backend_url}")
-    tester = ArtistPortfolioAPITester(backend_url)
+    print(f"🚀 Testing Artist Portfolio API at {backend_url}")
     
-    success = tester.run_all_tests()
-    return 0 if success else 1
+    # Initialize tester
+    tester = ArtistPortfolioTester(backend_url)
+    
+    # Run tests
+    tests = [
+        ("Get All Artworks", tester.test_get_all_artworks),
+        ("Get Artwork by ID", tester.test_get_artwork_by_id),
+        ("Get Artworks by Category", tester.test_get_artworks_by_category),
+        ("Get Featured Artworks", tester.test_get_featured_artworks),
+        ("Add to Cart", tester.test_add_to_cart),
+        ("Create Checkout Session", tester.test_checkout_session)
+    ]
+    
+    for test_name, test_func in tests:
+        print(f"\n📋 Running test: {test_name}")
+        result = test_func()
+        print(f"Result: {'✅ Passed' if result else '❌ Failed'}")
+    
+    # Print summary
+    print(f"\n📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    return 0 if tester.tests_passed == tester.tests_run else 1
 
 if __name__ == "__main__":
     sys.exit(main())
