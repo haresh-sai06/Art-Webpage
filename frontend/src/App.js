@@ -16,6 +16,13 @@ function App() {
   useEffect(() => {
     fetchArtworks();
     fetchFeaturedArtworks();
+    
+    // Check if returning from Stripe success
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    if (sessionId) {
+      setCurrentView('success');
+    }
   }, [filterCategory]);
 
   const fetchArtworks = async () => {
