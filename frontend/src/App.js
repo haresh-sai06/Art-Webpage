@@ -435,6 +435,28 @@ function App() {
     </div>
   );
 
+  const SuccessPage = () => (
+    <div className="success-page">
+      <div className="container">
+        <div className="success-content">
+          <div className="success-icon">✅</div>
+          <h2>Payment Successful!</h2>
+          <p>Thank you for your purchase. Your order has been confirmed and will be processed shortly.</p>
+          <p>You will receive an email confirmation with your order details and tracking information.</p>
+          <button 
+            className="cta-btn"
+            onClick={() => {
+              setCart([]);
+              setCurrentView('home');
+            }}
+          >
+            Continue Shopping
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const Cart = () => (
     <div className={`cart-sidebar ${isCartOpen ? 'open' : ''}`}>
       <div className="cart-header">
