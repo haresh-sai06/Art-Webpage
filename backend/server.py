@@ -283,6 +283,9 @@ async def create_checkout_session(checkout_request: CheckoutRequest):
 
 @app.get("/api/checkout/session/{session_id}")
 async def get_checkout_session(session_id: str):
+    if not stripe_checkout:
+        raise HTTPException(status_code=503, detail="Payment service not available")
+    
     try:
         status_response = stripe_checkout.get_checkout_session_status(session_id)
         return {
