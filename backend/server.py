@@ -298,6 +298,9 @@ async def get_checkout_session(session_id: str):
 
 @app.post("/api/orders/{order_id}/complete")
 async def complete_order(order_id: str):
+    if not stripe_checkout:
+        raise HTTPException(status_code=503, detail="Payment service not available")
+    
     try:
         # Find the order
         order = orders_collection.find_one({"id": order_id}, {"_id": 0})
