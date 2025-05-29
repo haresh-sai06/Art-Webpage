@@ -28,10 +28,13 @@ db = client[DB_NAME]
 
 # Stripe initialization
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY')
-if not STRIPE_API_KEY:
-    raise ValueError("STRIPE_API_KEY environment variable is required")
+stripe_checkout = None
 
-stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY)
+if STRIPE_API_KEY:
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY)
+    print("Stripe integration enabled")
+else:
+    print("Warning: STRIPE_API_KEY not found - payment features disabled")
 
 # Collections
 artworks_collection = db.artworks
