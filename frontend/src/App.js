@@ -479,8 +479,12 @@ function App() {
           <div className="cart-total">
             <strong>Total: ${getCartTotal().toFixed(2)}</strong>
           </div>
-          <button className="checkout-btn">
-            Proceed to Checkout
+          <button 
+            className="checkout-btn"
+            onClick={handleCheckout}
+            disabled={isCheckingOut}
+          >
+            {isCheckingOut ? 'Processing...' : 'Proceed to Checkout'}
           </button>
         </div>
       )}
