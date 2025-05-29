@@ -26,6 +26,13 @@ DB_NAME = os.environ.get('DB_NAME', 'artist_portfolio')
 client = MongoClient(MONGO_URL)
 db = client[DB_NAME]
 
+# Stripe initialization
+STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY')
+if not STRIPE_API_KEY:
+    raise ValueError("STRIPE_API_KEY environment variable is required")
+
+stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY)
+
 # Collections
 artworks_collection = db.artworks
 orders_collection = db.orders
