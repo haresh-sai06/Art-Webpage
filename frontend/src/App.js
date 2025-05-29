@@ -11,6 +11,7 @@ function App() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   useEffect(() => {
     fetchArtworks();
