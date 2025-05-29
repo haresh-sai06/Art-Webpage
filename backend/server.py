@@ -218,6 +218,9 @@ async def add_to_cart(item: CartItem):
 # Stripe checkout endpoints
 @app.post("/api/checkout/create-session")
 async def create_checkout_session(checkout_request: CheckoutRequest):
+    if not stripe_checkout:
+        raise HTTPException(status_code=503, detail="Payment service not available")
+    
     try:
         # Calculate line items from cart
         line_items = []
