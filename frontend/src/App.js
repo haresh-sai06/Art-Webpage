@@ -75,6 +75,48 @@ function App() {
     return cart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      alert('Your cart is empty!');
+      return;
+    }
+
+    setIsCheckingOut(true);
+    
+    try {
+      const checkoutData = {
+        items: cart.map(item => ({
+          artwork_id: item.id,
+          quantity: item.quantity
+        })),
+        customer_email: 'customer@example.com' // In production, get from form
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/checkout/create-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(checkoutData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+
+      const data = await response.json();
+      
+      // Redirect to Stripe checkout
+      window.location.href = data.session_url;
+      
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Failed to start checkout. Please try again.');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
   const Header = () => (
     <header className="header">
       <div className="container">
