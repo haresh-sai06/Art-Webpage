@@ -212,5 +212,109 @@ async def add_to_cart(item: CartItem):
         raise HTTPException(status_code=404, detail="Artwork not found")
     return {"message": "Item added to cart", "item": item}
 
+# Stripe checkout endpoints
+@app.post("/api/checkout/create-session")
+async def create_checkout_session(checkout_request: CheckoutRequest):
+    try:
+        # Calculate line items from cart
+        line_items = []
+        total_amount = 0
+        
+        for item in checkout_request.items:
+            artwork = artworks_collection.find_one({"id": item.artwork_id}, {"_id": 0})
+            if not artwork:
+                raise HTTPException(status_code=404, detail=f"Artwork {item.artwork_id} not found")
+            
+            line_items.append({
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': artwork['title'],
+                        'description': f"{artwork['medium']} - {artwork['size']}",
+                        'images': [artwork['image_url']]
+                    },
+                    'unit_amount': int(artwork['price'] * 100)  # Convert to cents
+                },
+                'quantity': item.quantity
+            })
+            total_amount += artwork['price'] * item.quantity
+        
+        # Create Stripe checkout session request
+        session_request = CheckoutSessionRequest(
+            line_items=line_items,
+            mode='payment',
+            success_url='https://b53e54d0-03b2-4a93-9b74-3e843efe8655.preview.emergentagent.com/success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url='https://b53e54d0-03b2-4a93-9b74-3e843efe8655.preview.emergentagent.com',
+            metadata={
+                'customer_email': checkout_request.customer_email or 'guest@example.com',
+                'artwork_ids': ','.join([item.artwork_id for item in checkout_request.items])
+            }
+        )
+        
+        # Create checkout session
+        session_response = stripe_checkout.create_checkout_session(session_request)
+        
+        # Store pending order in database
+        order_id = str(uuid.uuid4())
+        order = {
+            "id": order_id,
+            "items": [item.dict() for item in checkout_request.items],
+            "total_amount": total_amount,
+            "customer_email": checkout_request.customer_email or 'guest@example.com',
+            "status": "pending",
+            "payment_session_id": session_response.session_id
+        }
+        orders_collection.insert_one(order)
+        
+        return {
+            "session_id": session_response.session_id,
+            "session_url": session_response.session_url,
+            "order_id": order_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
+
+@app.get("/api/checkout/session/{session_id}")
+async def get_checkout_session(session_id: str):
+    try:
+        status_response = stripe_checkout.get_checkout_session_status(session_id)
+        return {
+            "session_id": session_id,
+            "status": status_response.status,
+            "payment_status": status_response.payment_status
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get session status: {str(e)}")
+
+@app.post("/api/orders/{order_id}/complete")
+async def complete_order(order_id: str):
+    try:
+        # Find the order
+        order = orders_collection.find_one({"id": order_id}, {"_id": 0})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Verify payment with Stripe
+        if order.get("payment_session_id"):
+            status_response = stripe_checkout.get_checkout_session_status(order["payment_session_id"])
+            if status_response.payment_status == "paid":
+                # Update order status
+                orders_collection.update_one(
+                    {"id": order_id},
+                    {"$set": {"status": "paid"}}
+                )
+                return {"message": "Order completed successfully", "order": order}
+        
+        raise HTTPException(status_code=400, detail="Payment not completed")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to complete order: {str(e)}")
+
+@app.get("/api/orders")
+async def get_orders():
+    orders = list(orders_collection.find({}, {"_id": 0}))
+    return orders
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
