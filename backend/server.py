@@ -55,6 +55,10 @@ class CartItem(BaseModel):
     artwork_id: str
     quantity: int = 1
 
+class CheckoutRequest(BaseModel):
+    items: List[CartItem]
+    customer_email: Optional[str] = None
+
 class Order(BaseModel):
     id: str
     items: List[CartItem]
